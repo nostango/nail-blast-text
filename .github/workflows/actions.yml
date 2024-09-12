@@ -11,19 +11,19 @@ jobs:
     
     steps:
     # Step 1: Checkout code from GitHub
-    - name: Checkout code
-      uses: actions/checkout@v2
-    
-    # Step 2: Run SonarQube analysis
-    - name: SonarQube Scan
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+    - uses: sonarsource/sonarqube-scan-action@master
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: |
-        sonar-scanner \
-          -Dsonar.projectKey=text-reminder-app \
-          -Dsonar.organization=your-organization \
-          -Dsonar.host.url=https://sonarcloud.io \
-          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    # If you wish to fail your job when the Quality Gate is red, uncomment the
+    # following lines. This would typically be used to fail a deployment.
+    # - uses: sonarsource/sonarqube-quality-gate-action@master
+    #   timeout-minutes: 5
+    #   env:
+    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
     # Step 3: Build Docker image
     - name: Build Docker image
