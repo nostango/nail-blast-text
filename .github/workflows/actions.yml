@@ -1,0 +1,47 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Checkout code from GitHub
+    - name: Checkout code
+      uses: actions/checkout@v2
+    
+    # Step 2: Run SonarQube analysis
+    - name: SonarQube Scan
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        sonar-scanner \
+          -Dsonar.projectKey=text-reminder-app \
+          -Dsonar.organization=your-organization \
+          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+    # Step 3: Build Docker image
+    - name: Build Docker image
+      run: docker build -t text-reminder-app .
+
+    # Step 4: Push Docker image to AWS ECR
+    - name: Push to AWS ECR
+      run: |
+        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+        docker tag text-reminder-app:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/text-reminder-app:latest
+        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/text-reminder-app:latest
+
+    # Step 5: Deploy to AWS Lambda (optional if using Docker for Lambda)
+    - name: Deploy to AWS Lambda
+      uses: aws-actions/aws-lambda-deploy@v1
+      with:
+        function-name: text-reminder-app-lambda
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        zip-file: ./lambda_function.zip
+        region: us-east-1
