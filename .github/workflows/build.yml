@@ -52,7 +52,7 @@ jobs:
         AWS_REGION: ${{ secrets.AWS_REGION }}
       run: |
         aws lambda update-function-code \
-          --function-name lambda \
+          --function-name nail-tech-blast-lambda \
           --zip-file fileb://function.zip \
           --region $AWS_REGION
 
@@ -63,4 +63,4 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: ${{ secrets.AWS_REGION }}
       run: |
-        aws lambda get-function --function-name your-lambda-function-name --region $AWS_REGION
+        aws lambda get-function --function-name nail-tech-blast-lambda --region $AWS_REGION
