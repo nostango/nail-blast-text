@@ -1,0 +1,51 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  build:
+    name: Build and analyze and push
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Checkout code from GitHub
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+    
+    # Step 2: Run SonarQube analysis
+    #- uses: sonarsource/sonarqube-scan-action@master
+      #env:
+        #SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    # Step 3: Build Docker image
+    #- name: Build Docker image
+    #  run: docker build -t nail-blast-text .
+
+    # Step 4: Push Docker image to AWS ECR
+    #- name: Push Docker image to AWS ECR
+    #  run: |
+    #    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+    #    docker tag nail-blast-text:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/nail-blast-text:latest
+    #    docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/nail-blast-text:latest
+
+    # Step 5: Deploy to AWS Lambda (Docker-based deployment)
+    #- name: Deploy to AWS Lambda
+    #  run: |
+    #    aws lambda update-function-code --function-name nail-blast-text-lambda \
+    #    --image-uri ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/nail-blast-text:latest
