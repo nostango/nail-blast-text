@@ -7,6 +7,7 @@ on:
 
 jobs:
   build:
+    name: Build and analyze and push
     runs-on: ubuntu-latest
     
     steps:
@@ -23,17 +24,17 @@ jobs:
 
     # Step 3: Build Docker image
     - name: Build Docker image
-      run: docker build -t text-reminder-app .
+      run: docker build -t nail-blast-text .
 
     # Step 4: Push Docker image to AWS ECR
     - name: Push Docker image to AWS ECR
       run: |
         aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-        docker tag text-reminder-app:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/text-reminder-app:latest
-        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/text-reminder-app:latest
+        docker tag nail-blast-text:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/nail-blast-text:latest
+        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/nail-blast-text:latest
 
     # Step 5: Deploy to AWS Lambda (Docker-based deployment)
     - name: Deploy to AWS Lambda
       run: |
-        aws lambda update-function-code --function-name text-reminder-app-lambda \
-        --image-uri ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/text-reminder-app:latest
+        aws lambda update-function-code --function-name nail-blast-text-lambda \
+        --image-uri ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/nail-blast-text:latest
