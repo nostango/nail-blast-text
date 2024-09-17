@@ -42,7 +42,7 @@ jobs:
 
     # Step 3: Zip the Lambda function (assuming your Python code is in 'src/' folder)
     - name: Zip Lambda function
-      run: zip -r function.zip src/
+      run: zip -r function.zip backend/src/
 
     # Step 4: Deploy to AWS Lambda
     - name: Deploy Lambda function
