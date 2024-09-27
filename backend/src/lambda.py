@@ -24,8 +24,22 @@ def send_sms(phone_number, message):
     # Integration with Twilio or another SMS service
     pass
 
-
 def handler(event, context):
+    # Get HTTP method
+    method = event.get('httpMethod')
+    
+    # Handle CORS preflight request
+    if method == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',  # or specify your domain
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
+            },
+            'body': ''
+        }
+    
     # Parse incoming message
     body = json.loads(event['body'])
     message = body.get('message')
@@ -35,6 +49,9 @@ def handler(event, context):
     if phone_number != cassidy:
         return {
             'statusCode': 401,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+            },
             'body': json.dumps('Unauthorized')
         }
     else:
@@ -49,11 +66,17 @@ def handler(event, context):
             
             return {
                 'statusCode': 200,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                },
                 'body': json.dumps('Message sent successfully')
             }
         else:
             # Ask for confirmation
             return {
                 'statusCode': 200,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                },
                 'body': json.dumps('Is this what you want to send?')
             }
