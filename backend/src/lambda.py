@@ -2,7 +2,6 @@ import json
 import boto3
 
 # Authorized phone number
-cassidy = '+15555555555'
 dynamodb = boto3.resource('dynamodb')
 clients_table = dynamodb.Table('client_db')
 
@@ -16,21 +15,24 @@ def send_message_to_all_clients(message):
         send_sms(client['phone_number'], message)
 
 def send_message_to_selected_clients(message, clients_list):
-    # Send message to selected clients
-    for client in clients_list:
-        send_sms(client, message)
+    # clients_list is expected to be a list of recipient IDs (phone numbers)
+    for client_id in clients_list:
+        # Retrieve client details from DynamoDB
+        response = clients_table.get_item(Key={'id': client_id})
+        client = response.get('Item')
+        if client:
+            send_sms(client['phone_number'], message)
 
 def send_sms(phone_number, message):
     # Integration with Twilio or another SMS service
     pass
 
 def handler(event, context):
-    # Get HTTP method
     method = event.get('httpMethod')
     
     # Default headers
     headers = {
-        'Access-Control-Allow-Origin': '*',  # or specify your domain
+        'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
     }
@@ -43,38 +45,49 @@ def handler(event, context):
             'body': ''
         }
     
-    # Parse incoming message
-    body = json.loads(event['body'])
-    message = body.get('message')
-    phone_number = body.get('phone_number')
-    confirm = body.get('confirm')
-    send_to = body.get('send_to', 'all')
-    
-    # Check if the phone number is authorized
-    if phone_number != cassidy:
+    try:
+        body = json.loads(event['body'])
+    except Exception as e:
+        print(f"Error parsing body: {e}")
         return {
-            'statusCode': 401,
+            'statusCode': 400,
             'headers': headers,
-            'body': json.dumps('Unauthorized')
+            'body': json.dumps('Invalid request body')
         }
+    
+    message = body.get('message')
+    all_numbers = body.get('all_numbers', False)
+    select_numbers = body.get('select_numbers', [])
+    csv_data = body.get('csv_data', [])
+
+    # Process CSV data if present
+    if csv_data:
+        for row in csv_data:
+            name = row.get('name')
+            phone_number = row.get('phone_number')
+            email = row.get('email', '')
+
+            if not name or not phone_number:
+                print(f"Skipping row with missing data: {row}")
+                continue  # Skip rows with missing required data
+
+            # Put item into DynamoDB
+            clients_table.put_item(Item={
+                'id': phone_number,  # Use phone_number as unique identifier
+                'name': name,
+                'phone_number': phone_number,
+                'email': email,
+                # Add other attributes if needed
+            })
+    
+    # Send messages
+    if all_numbers:
+        send_message_to_all_clients(message)
     else:
-        # Confirmation message logic
-        if confirm == "yes":
-            # Send message to all or selected clients
-            if send_to == 'all':
-                send_message_to_all_clients(message)
-            else:
-                send_message_to_selected_clients(message, send_to)
-            
-            return {
-                'statusCode': 200,
-                'headers': headers,
-                'body': json.dumps('Message sent successfully')
-            }
-        else:
-            # Ask for confirmation
-            return {
-                'statusCode': 200,
-                'headers': headers,
-                'body': json.dumps('Is this what you want to send?')
-            }
+        send_message_to_selected_clients(message, select_numbers)
+    
+    return {
+        'statusCode': 200,
+        'headers': headers,
+        'body': json.dumps('Message sent successfully')
+    }
