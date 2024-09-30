@@ -28,15 +28,18 @@ def handler(event, context):
     # Get HTTP method
     method = event.get('httpMethod')
     
+    # Default headers
+    headers = {
+        'Access-Control-Allow-Origin': '*',  # or specify your domain
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
+    }
+    
     # Handle CORS preflight request
     if method == 'OPTIONS':
         return {
             'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',  # or specify your domain
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
-            },
+            'headers': headers,
             'body': ''
         }
     
@@ -44,21 +47,20 @@ def handler(event, context):
     body = json.loads(event['body'])
     message = body.get('message')
     phone_number = body.get('phone_number')
-
+    confirm = body.get('confirm')
+    send_to = body.get('send_to', 'all')
+    
     # Check if the phone number is authorized
     if phone_number != cassidy:
         return {
             'statusCode': 401,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-            },
+            'headers': headers,
             'body': json.dumps('Unauthorized')
         }
     else:
         # Confirmation message logic
-        if body.get('confirm') == "yes":
+        if confirm == "yes":
             # Send message to all or selected clients
-            send_to = body.get('send_to', 'all')
             if send_to == 'all':
                 send_message_to_all_clients(message)
             else:
@@ -66,17 +68,13 @@ def handler(event, context):
             
             return {
                 'statusCode': 200,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                },
+                'headers': headers,
                 'body': json.dumps('Message sent successfully')
             }
         else:
             # Ask for confirmation
             return {
                 'statusCode': 200,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                },
+                'headers': headers,
                 'body': json.dumps('Is this what you want to send?')
             }

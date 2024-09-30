@@ -48,7 +48,7 @@ export function GroupMessageFormComponent() {
     }
 
     try {
-      const response = await fetch('https://nq459tbg1m.execute-api.us-east-1.amazonaws.com', {
+      const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
