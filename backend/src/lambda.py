@@ -1,7 +1,7 @@
 import json
 import boto3
 
-# Authorized phone number
+# this is a test to make sure the lambda really does get uploaded to AWS
 dynamodb = boto3.resource('dynamodb')
 clients_table = dynamodb.Table('client_db')
 
