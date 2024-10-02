@@ -3,7 +3,7 @@ import boto3
 
 # this is a test to make sure the lambda really does get uploaded to AWS
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-clients_table = dynamodb.Table('client_db')
+clients_table = dynamodb.Table('client_db_test')
 
 def get_all_clients():
     response = clients_table.scan()
