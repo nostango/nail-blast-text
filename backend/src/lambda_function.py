@@ -54,7 +54,7 @@ def handler(event, context):
         clients = get_all_clients()
         return {
             'statusCode': 200,
-            'headers': {'Access-Control-Allow-Origin': '*'},
+            'headers': headers,
             'body': json.dumps(clients)
         }
     
@@ -97,6 +97,8 @@ def handler(event, context):
         send_message_to_all_clients(message)
     else:
         send_message_to_selected_clients(message, select_numbers)
+
+    
     
     return {
         'statusCode': 200,
