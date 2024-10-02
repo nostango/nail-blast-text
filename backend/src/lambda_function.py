@@ -2,7 +2,7 @@ import json
 import boto3
 
 # this is a test to make sure the lambda really does get uploaded to AWS
-dynamodb = boto3.resource('dynamodb')
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 clients_table = dynamodb.Table('client_db')
 
 def send_message_to_all_clients(message):
@@ -24,7 +24,8 @@ def send_message_to_selected_clients(message, clients_list):
             send_sms(client['phone_number'], message)
 
 def send_sms(phone_number, message):
-    # Integration with Twilio or another SMS service
+    # Send SMS with Twilio
+    print(f"Sending SMS to {phone_number}: {message}")
     pass
 
 def handler(event, context):
@@ -76,8 +77,7 @@ def handler(event, context):
                 'id': phone_number,  # Use phone_number as unique identifier
                 'name': name,
                 'phone_number': phone_number,
-                'email': email,
-                # Add other attributes if needed
+                'email': email
             })
     
     # Send messages

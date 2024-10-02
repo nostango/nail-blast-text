@@ -62,17 +62,36 @@ export function GroupMessageFormComponent() {
         skipEmptyLines: true,
         complete: (results) => {
           const data = results.data
-  
-          // Normalize column names
+
+          interface ColumnNameMapping {
+            'Client name': string;
+            Name: string;
+            'Client email address': string;
+            Email: string;
+            'Client phone number': string;
+            'Phone Number': string;
+          }
+          
+          // Example mapping
+          const columnNameMapping: ColumnNameMapping = {
+            'Client name': 'name',
+            Name: 'name',
+            'Client email address': 'email',
+            Email: 'email',
+            'Client phone number': 'phone_number',
+            'Phone Number': 'phone_number'
+          }
+          
           const normalizedData = data.map((row: any) => {
             const normalizedRow: any = {}
             for (const key in row) {
-              const normalizedKey = columnNameMapping[key.trim()]
+              const trimmedKey = key.trim() as keyof ColumnNameMapping
+              const normalizedKey = columnNameMapping[trimmedKey]
               if (normalizedKey) {
                 normalizedRow[normalizedKey] = row[key].trim()
               }
             }
-            return normalizedRow
+            return normalizedRow;
           })
   
           // Filter out rows without required fields
