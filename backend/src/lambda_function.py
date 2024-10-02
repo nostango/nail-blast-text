@@ -5,6 +5,10 @@ import boto3
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 clients_table = dynamodb.Table('client_db')
 
+def get_all_clients():
+    response = clients_table.scan()
+    return response.get('Items', [])
+
 def send_message_to_all_clients(message):
     # Pull all clients from DynamoDB
     response = clients_table.scan()
@@ -44,6 +48,14 @@ def handler(event, context):
             'statusCode': 200,
             'headers': headers,
             'body': ''
+        }
+    
+    if method == 'GET':
+        clients = get_all_clients()
+        return {
+            'statusCode': 200,
+            'headers': {'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps(clients)
         }
     
     try:

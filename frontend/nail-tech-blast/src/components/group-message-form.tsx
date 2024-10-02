@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import { useEffect } from 'react';
 import Papa from 'papaparse'
 
 interface Recipient {
@@ -19,13 +20,28 @@ export function GroupMessageFormComponent() {
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([])
   const [csvData, setCsvData] = useState<any[]>([])
   const [allNumbers, setAllNumbers] = useState(false)
-  const [recipients, setRecipients] = useState<Recipient[]>([
-    { id: '1', name: 'Alice Johnson', phone_number: '+15555555555' },
-    { id: '2', name: 'Bob Smith', phone_number: '+15555555556' },
-    { id: '3', name: 'John Doe', phone_number: '+15555555557' },
-    { id: '4', name: 'Charlie Wilson', phone_number: '+15555555558' },
-    { id: '5', name: 'Ethan Hunt', phone_number: '+15555555559' },
-  ])
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+
+  useEffect(() => {
+    const fetchRecipients = async () => {
+      try {
+        const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
+          method: 'GET',
+        });
+        const data = await response.json();
+        setRecipients(data.map((item: any, index: number) => ({
+          id: index.toString(),
+          name: item.name,
+          phone_number: item.phone_number,
+          email: item.email || '',
+        })));
+      } catch (error) {
+        console.error('Error fetching recipients:', error);
+      }
+    };
+
+    fetchRecipients();
+  }, []);
 
   const handleSelectAll = () => {
     setSelectedRecipients(recipients.map(r => r.id))
