@@ -32,15 +32,15 @@ def send_sms(phone_number, message):
     print(f"Sending SMS to {phone_number}: {message}")
     pass
 
+# Default headers
+headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
+}
+
 def handler(event, context):
     method = event.get('httpMethod')
-    
-    # Default headers
-    headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
-    }
     
     # Handle CORS preflight request
     if method == 'OPTIONS':
