@@ -51,12 +51,19 @@ def handler(event, context):
         }
     
     if method == 'GET':
-        clients = get_all_clients()
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': json.dumps(clients)
-        }
+        try:
+            clients = get_all_clients()
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': json.dumps(clients)
+            }
+        except Exception as e:
+            return {
+                'statusCode': 500,
+                'headers': headers,
+                'body': json.dumps(f"Internal Server Error: {str(e)}")
+            }
     
     # Handle POST request
     if method == 'POST':
