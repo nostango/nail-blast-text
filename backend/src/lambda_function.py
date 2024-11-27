@@ -78,37 +78,36 @@ def handler(event, context):
         try:
             body = json.loads(event['body'])
         except json.JSONDecodeError as e:
-            # If the body cannot be parsed as JSON, return a 400 error
             return {
                 'statusCode': 400,
                 'headers': headers,
                 'body': json.dumps(f'Invalid JSON in request body: {str(e)}')
             }
 
+
         # Process the POST request
         message = body.get('message')
         all_numbers = body.get('all_numbers', False)
         select_numbers = body.get('select_numbers', [])
-        csv_data = body.get('csv_data', [])
-
         # Process CSV data if present
-        if csv_data:
-            for row in csv_data:
-                name = row.get('name')
-                phone_number = row.get('phone_number')
-                email = row.get('email', '')
+        csv_data = body.get('csv_data', [])
+    if csv_data:
+        for row in csv_data:
+            name = row.get('name')
+            phone_number = row.get('phone_number')
+            email = row.get('email', '')
 
-                if not name or not phone_number:
-                    print(f"Skipping row with missing data: {row}")
-                    continue  # Skip rows with missing required data
+            if not name or not phone_number:
+                print(f"Skipping row with missing data: {row}")
+                continue  # Skip rows with missing required data
 
-                # Put item into DynamoDB
-                clients_table.put_item(Item={
-                    'id': phone_number,  # Use phone_number as unique identifier
-                    'name': name,
-                    'phone_number': phone_number,
-                    'email': email
-                })
+            # Put item into DynamoDB
+            clients_table.put_item(Item={
+                'id': phone_number,  # Use phone_number as unique identifier
+                'name': name,
+                'phone_number': phone_number,
+                'email': email
+            })
 
         # Send messages
         if all_numbers:
