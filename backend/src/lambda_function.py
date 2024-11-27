@@ -141,7 +141,7 @@ def handler(event, context):
             send_message_to_selected_clients(message, select_numbers)
 
         # Determine the response message
-        response_message = 'Message sent successfully.'
+        response_message = f'Message sent to selected clients: {select_numbers}'
         if csv_processed:
             response_message += ' CSV data processed and clients updated.'
 
