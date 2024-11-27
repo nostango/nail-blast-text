@@ -135,14 +135,14 @@ export function GroupMessageFormComponent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
+  
     const formData = {
       message,
       all_numbers: allNumbers,
       select_numbers: selectedRecipients,
       csv_data: csvData,
     }
-
+  
     try {
       const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
         method: 'POST',
@@ -151,22 +151,26 @@ export function GroupMessageFormComponent() {
         },
         body: JSON.stringify(formData),
       })
-
+  
       if (!response.ok) {
-        throw new Error('Error in sending the message.')
+        // Attempt to parse error message from response
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Error in sending the message.')
       }
-
+  
       const result = await response.json()
       console.log('Message sent successfully:', result)
-
+  
       // Reset form if needed
       setMessage('')
       setSelectedRecipients([])
       setAllNumbers(false)
       setCsvData([])
-
-    } catch (error) {
-      console.error('Error:', error)
+  
+    } catch (error: any) {
+      console.error('Error:', error.message || error)
+      // Optionally, display the error message to the user
+      alert(`Failed to send message: ${error.message || 'Unknown error.'}`)
     }
   }
 
