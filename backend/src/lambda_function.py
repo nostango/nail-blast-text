@@ -145,8 +145,7 @@ def handler(event, context):
         else:
             second_cond_response = send_message_to_selected_clients(message, select_numbers)
             response_message = f'Message sent to selected clients: {second_cond_response}'
-
-        response_message = f'Message sent to selected clients: '
+        
         if csv_processed:
             response_message += ' CSV data processed and clients updated.'
 
