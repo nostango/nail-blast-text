@@ -110,6 +110,9 @@ def handler(event, context):
         print(f"Selected Numbers: {select_numbers}")
         print(f"CSV Data: {csv_data}")
 
+        # Initialize a flag to track if CSV data was processed
+        csv_processed = False
+
         if csv_data:
             print(f"Processing CSV data with {len(csv_data)} rows.")
             for row in csv_data:
@@ -129,25 +132,24 @@ def handler(event, context):
                     'phone_number': phone_number,
                     'email': email
                 })
+            csv_processed = True
 
-            # Send messages
-            if all_numbers:
-                send_message_to_all_clients(message)
-            else:
-                send_message_to_selected_clients(message, select_numbers)
-
-            return {
-                'statusCode': 200,
-                'headers': headers,
-                'body': json.dumps('Message sent successfully')
-            }
+        # Send messages
+        if all_numbers:
+            send_message_to_all_clients(message)
         else:
-            print("No CSV data provided in POST request.")
-            return {
-                'statusCode': 400,
-                'headers': headers,
-                'body': json.dumps('CSV data is required for sending messages')
-            }
+            send_message_to_selected_clients(message, select_numbers)
+
+        # Determine the response message
+        response_message = 'Message sent successfully.'
+        if csv_processed:
+            response_message += ' CSV data processed and clients updated.'
+
+        return {
+            'statusCode': 200,
+            'headers': headers,
+            'body': json.dumps(response_message)
+        }
 
     # If an unsupported method is used, return a 405 Method Not Allowed
     print(f"Method {method} not allowed.")
