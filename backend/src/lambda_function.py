@@ -140,8 +140,19 @@ def handler(event, context):
         else:
             send_message_to_selected_clients(message, select_numbers)
 
-        # Determine the response message
-        response_message = f'Message sent to selected clients: {select_numbers}'
+        # Response message should be the numbers, names and message sent
+        # Extract names from select_numbers
+        names = []
+        for client_id in select_numbers:
+            response = clients_table.get_item(Key={'id': client_id})
+            client = response.get('Item')
+            if client:
+                names.append(client['name'])
+
+        # Combine names and phone numbers into a single string
+        name = ', '.join(names)
+        all_numbers = ', '.join(select_numbers)
+        response_message = f'Message sent to selected clients: {all_numbers}, {name}'
         if csv_processed:
             response_message += ' CSV data processed and clients updated.'
 
