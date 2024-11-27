@@ -22,7 +22,7 @@ def send_message_to_all_clients(message):
     for client in clients:
         send_sms(client['phone_number'], message)
     
-    return (f"Message sent to all {len(clients)} clients.")
+    return (f"Message sent to all {len(clients)} clients: {clients}")
 
 def send_message_to_selected_clients(message, clients_list):
     print(f"Sending messages to selected clients: {clients_list}")
@@ -37,7 +37,7 @@ def send_message_to_selected_clients(message, clients_list):
         else:
             print(f"No client found with ID: {client_id}")
 
-    return (f"Message sent to all {len(clients_list)} clients.")
+    return (f"Message sent to {len(clients_list)} clients: {clients_list}")
 
 def send_sms(phone_number, message):
     # Send SMS with Twilio
