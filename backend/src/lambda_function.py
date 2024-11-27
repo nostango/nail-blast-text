@@ -21,6 +21,8 @@ def send_message_to_all_clients(message):
     # Send message to each client
     for client in clients:
         send_sms(client['phone_number'], message)
+    
+    return (f"Message sent to all {len(clients)} clients.")
 
 def send_message_to_selected_clients(message, clients_list):
     print(f"Sending messages to selected clients: {clients_list}")
@@ -34,6 +36,8 @@ def send_message_to_selected_clients(message, clients_list):
             send_sms(client['phone_number'], message)
         else:
             print(f"No client found with ID: {client_id}")
+
+    return (f"Message sent to all {len(clients_list)} clients.")
 
 def send_sms(phone_number, message):
     # Send SMS with Twilio
@@ -136,23 +140,13 @@ def handler(event, context):
 
         # Send messages
         if all_numbers:
-            send_message_to_all_clients(message)
+            first_cond_response = send_message_to_all_clients(message)
+            response_message = f'Message sent to selected clients: {first_cond_response}'
         else:
-            send_message_to_selected_clients(message, select_numbers)
+            second_cond_response = send_message_to_selected_clients(message, select_numbers)
+            response_message = f'Message sent to selected clients: {second_cond_response}'
 
-        # Response message should be the numbers, names and message sent
-        # Extract names from select_numbers
-        names = []
-        for client_id in select_numbers:
-            response = clients_table.get_item(Key={'id': client_id})
-            client = response.get('Item')
-            if client:
-                names.append(client['name'])
-
-        # Combine names and phone numbers into a single string
-        name = ', '.join(names)
-        all_numbers = ', '.join(select_numbers)
-        response_message = f'Message sent to selected clients: {all_numbers}, {name}'
+        response_message = f'Message sent to selected clients: '
         if csv_processed:
             response_message += ' CSV data processed and clients updated.'
 
