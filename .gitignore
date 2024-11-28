@@ -2,3 +2,4 @@ __pycache__/
 .env
 node_modules/
 test/
+frontend/nail-tech-blast/my_lambda_function/

@@ -3,6 +3,7 @@ import boto3
 import os
 from botocore.exceptions import ClientError
 from twilio.rest import Client
+from twilio.base.exceptions import TwilioRestException
 
 # Initialize DynamoDB resource
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
@@ -14,8 +15,10 @@ secrets_client = boto3.client('secretsmanager', region_name='us-east-1')
 # Environment variable for the secret name
 SECRET_NAME = os.environ.get('TWILIO_SECRET_NAME', 'twilio/credentials')
 
-# Cache for Twilio credentials
+# Cache for Twilio credentials and client
 twilio_secrets_cache = {}
+twilio_client_cache = None
+twilio_phone_number_cache = None
 
 def get_twilio_credentials():
     """
@@ -37,9 +40,17 @@ def get_twilio_credentials():
     try:
         secret = response['SecretString']
         secret_dict = json.loads(secret)
-    except json.JSONDecodeError as e:
+    except (KeyError, json.JSONDecodeError) as e:
         print(f"Error decoding secret JSON: {e}")
         raise e
+
+    # Validate required keys
+    required_keys = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER']
+    for key in required_keys:
+        if key not in secret_dict:
+            error_msg = f"Missing key '{key}' in secret {SECRET_NAME}"
+            print(error_msg)
+            raise KeyError(error_msg)
 
     # Cache the secrets
     twilio_secrets_cache = {
@@ -50,12 +61,29 @@ def get_twilio_credentials():
 
     return twilio_secrets_cache
 
-# Retrieve Twilio credentials once and initialize Twilio client
-twilio_secrets = get_twilio_credentials()
-twilio_client = Client(twilio_secrets['TWILIO_ACCOUNT_SID'], twilio_secrets['TWILIO_AUTH_TOKEN'])
-twilio_phone_number = twilio_secrets['TWILIO_PHONE_NUMBER']
+def get_twilio_client():
+    """
+    Initialize and cache the Twilio client.
+    """
+    global twilio_client_cache, twilio_phone_number_cache
+
+    if twilio_client_cache and twilio_phone_number_cache:
+        return twilio_client_cache, twilio_phone_number_cache
+
+    twilio_secrets = get_twilio_credentials()
+    try:
+        twilio_client_cache = Client(twilio_secrets['TWILIO_ACCOUNT_SID'], twilio_secrets['TWILIO_AUTH_TOKEN'])
+        twilio_phone_number_cache = twilio_secrets['TWILIO_PHONE_NUMBER']
+    except Exception as e:
+        print(f"Error initializing Twilio client: {e}")
+        raise e
+
+    return twilio_client_cache, twilio_phone_number_cache
 
 def get_all_clients():
+    """
+    Fetch all clients from DynamoDB.
+    """
     print("Fetching all clients from DynamoDB.")
     try:
         response = clients_table.scan()
@@ -66,17 +94,23 @@ def get_all_clients():
         print(f"Error fetching clients: {e}")
         raise e
 
-def send_message_to_all_clients(message):
+def send_message_to_all_clients(message, twilio_client, twilio_phone_number):
+    """
+    Send SMS messages to all clients.
+    """
     print("Sending messages to all clients.")
     clients = get_all_clients()
     print(f"Found {len(clients)} clients to send messages to.")
     
     for client in clients:
-        send_sms(client['phone_number'], message)
+        send_sms(client['phone_number'], message, twilio_client, twilio_phone_number)
     
     return f"Message sent to all {len(clients)} clients."
 
-def send_message_to_selected_clients(message, clients_list):
+def send_message_to_selected_clients(message, clients_list, twilio_client, twilio_phone_number):
+    """
+    Send SMS messages to selected clients based on their IDs.
+    """
     print(f"Sending messages to selected clients: {clients_list}")
     successful_sends = 0
 
@@ -86,7 +120,7 @@ def send_message_to_selected_clients(message, clients_list):
             response = clients_table.get_item(Key={'id': client_id})
             client = response.get('Item')
             if client and 'phone_number' in client:
-                send_sms(client['phone_number'], message)
+                send_sms(client['phone_number'], message, twilio_client, twilio_phone_number)
                 successful_sends += 1
             else:
                 print(f"No client found with ID: {client_id} or missing phone number.")
@@ -95,7 +129,10 @@ def send_message_to_selected_clients(message, clients_list):
 
     return f"Message sent to {successful_sends} clients."
 
-def send_sms(phone_number, message):
+def send_sms(phone_number, message, twilio_client, twilio_phone_number):
+    """
+    Send an SMS message via Twilio.
+    """
     try:
         print(f"Sending SMS to {phone_number}: {message}")
         sent_message = twilio_client.messages.create(
@@ -104,10 +141,12 @@ def send_sms(phone_number, message):
             to=phone_number
         )
         print(f"Message sent with SID: {sent_message.sid}")
+    except TwilioRestException as e:
+        print(f"Twilio error while sending SMS to {phone_number}: {e}")
     except Exception as e:
-        print(f"Failed to send SMS to {phone_number}: {e}")
+        print(f"Unexpected error while sending SMS to {phone_number}: {e}")
 
-# Default headers
+# Default headers for HTTP responses
 headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -115,6 +154,9 @@ headers = {
 }
 
 def handler(event, context):
+    """
+    AWS Lambda handler function.
+    """
     method = event.get('httpMethod')
     print(f"Received {method} request.")
 
@@ -127,6 +169,17 @@ def handler(event, context):
             'body': ''
         }
     
+    # Initialize Twilio client inside the handler
+    try:
+        twilio_client, twilio_phone_number = get_twilio_client()
+    except Exception as e:
+        print(f"Failed to initialize Twilio client: {e}")
+        return {
+            'statusCode': 500,
+            'headers': headers,
+            'body': json.dumps('Internal Server Error: Failed to initialize Twilio client')
+        }
+
     if method == 'GET':
         try:
             clients = get_all_clients()
@@ -214,9 +267,9 @@ def handler(event, context):
 
         # Send messages
         if all_numbers:
-            response_message = send_message_to_all_clients(message)
+            response_message = send_message_to_all_clients(message, twilio_client, twilio_phone_number)
         elif select_numbers:
-            response_message = send_message_to_selected_clients(message, select_numbers)
+            response_message = send_message_to_selected_clients(message, select_numbers, twilio_client, twilio_phone_number)
         else:
             response_message = 'No recipients specified.'
 
