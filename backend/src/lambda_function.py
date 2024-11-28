@@ -1,9 +1,32 @@
 import json
 import boto3
+from botocore.exceptions import ClientError
+from twilio.rest import Client
 
 # Initialize DynamoDB resource
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 clients_table = dynamodb.Table('client_db_test')
+
+# Initialize Secrets Manager client
+secrets_client = boto3.client('secretsmanager', region_name='us-east-1')
+secret_name = 'twilio/credentials'
+
+# Function to retrieve Twilio credentials from Secrets Manager
+def get_twilio_credentials():
+    try:
+        response = secrets_client.get_secret_value(SecretId=secret_name)
+        secret = response['SecretString']
+        secret_dict = json.loads(secret)
+        return secret_dict
+    except ClientError as e:
+        print(f"Error retrieving secret {secret_name}: {e}")
+        raise e
+
+# Retrieve Twilio credentials once and initialize Twilio client
+twilio_secrets = get_twilio_credentials()
+twilio_client = Client(twilio_secrets['TWILIO_ACCOUNT_SID'], twilio_secrets['TWILIO_AUTH_TOKEN'])
+twilio_phone_number = twilio_secrets['TWILIO_PHONE_NUMBER']
+
 
 def get_all_clients():
     print("Fetching all clients from DynamoDB.")
@@ -40,9 +63,16 @@ def send_message_to_selected_clients(message, clients_list):
     return (f"Message sent to {len(clients_list)} clients: {clients_list}")
 
 def send_sms(phone_number, message):
-    # Send SMS with Twilio
-    print(f"Sending SMS to {phone_number}: {message}")
-    pass  # Replace with actual Twilio integration
+    try:
+        print(f"Sending SMS to {phone_number}: {message}")
+        message = twilio_client.messages.create(
+            body=message,
+            from_=twilio_phone_number,
+            to=phone_number
+        )
+        print(f"Message sent with SID: {message.sid}")
+    except Exception as e:
+        print(f"Failed to send SMS to {phone_number}: {e}")
 
 # Default headers
 headers = {
