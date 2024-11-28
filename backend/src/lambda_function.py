@@ -10,18 +10,45 @@ clients_table = dynamodb.Table('client_db_test')
 
 # Initialize Secrets Manager client
 secrets_client = boto3.client('secretsmanager', region_name='us-east-1')
-secret_name = 'twilio/credentials'
 
-# Function to retrieve Twilio credentials from Secrets Manager
+# Environment variable for the secret name
+SECRET_NAME = os.environ.get('TWILIO_SECRET_NAME', 'twilio/credentials')
+
+# Cache for Twilio credentials
+twilio_secrets_cache = {}
+
 def get_twilio_credentials():
+    """
+    Retrieve Twilio credentials from AWS Secrets Manager.
+    Caches the credentials to avoid multiple calls.
+    """
+    global twilio_secrets_cache
+
+    if twilio_secrets_cache:
+        return twilio_secrets_cache
+
     try:
-        response = secrets_client.get_secret_value(SecretId=secret_name)
+        response = secrets_client.get_secret_value(SecretId=SECRET_NAME)
+    except ClientError as e:
+        print(f"Error retrieving secret {SECRET_NAME}: {e}")
+        raise e
+
+    # Parse the secret JSON
+    try:
         secret = response['SecretString']
         secret_dict = json.loads(secret)
-        return secret_dict
-    except ClientError as e:
-        print(f"Error retrieving secret {secret_name}: {e}")
+    except json.JSONDecodeError as e:
+        print(f"Error decoding secret JSON: {e}")
         raise e
+
+    # Cache the secrets
+    twilio_secrets_cache = {
+        'TWILIO_ACCOUNT_SID': secret_dict['TWILIO_ACCOUNT_SID'],
+        'TWILIO_AUTH_TOKEN': secret_dict['TWILIO_AUTH_TOKEN'],
+        'TWILIO_PHONE_NUMBER': secret_dict['TWILIO_PHONE_NUMBER']
+    }
+
+    return twilio_secrets_cache
 
 # Retrieve Twilio credentials once and initialize Twilio client
 twilio_secrets = get_twilio_credentials()
@@ -30,18 +57,20 @@ twilio_phone_number = twilio_secrets['TWILIO_PHONE_NUMBER']
 
 def get_all_clients():
     print("Fetching all clients from DynamoDB.")
-    response = clients_table.scan()
-    print(f"Retrieved {len(response.get('Items', []))} clients.")
-    return response.get('Items', [])
+    try:
+        response = clients_table.scan()
+        clients = response.get('Items', [])
+        print(f"Retrieved {len(clients)} clients.")
+        return clients
+    except ClientError as e:
+        print(f"Error fetching clients: {e}")
+        raise e
 
 def send_message_to_all_clients(message):
     print("Sending messages to all clients.")
-    # Pull all clients from DynamoDB
-    response = clients_table.scan()
-    clients = response.get('Items', [])
+    clients = get_all_clients()
     print(f"Found {len(clients)} clients to send messages to.")
     
-    # Send message to each client
     for client in clients:
         send_sms(client['phone_number'], message)
     
@@ -49,28 +78,32 @@ def send_message_to_all_clients(message):
 
 def send_message_to_selected_clients(message, clients_list):
     print(f"Sending messages to selected clients: {clients_list}")
-    # clients_list is expected to be a list of recipient IDs (phone numbers)
-    for client_id in clients_list:
-        # Retrieve client details from DynamoDB
-        print(f"Fetching client with ID: {client_id}")
-        response = clients_table.get_item(Key={'id': client_id})
-        client = response.get('Item')
-        if client:
-            send_sms(client['phone_number'], message)
-        else:
-            print(f"No client found with ID: {client_id}")
+    successful_sends = 0
 
-    return f"Message sent to {len(clients_list)} clients."
+    for client_id in clients_list:
+        try:
+            print(f"Fetching client with ID: {client_id}")
+            response = clients_table.get_item(Key={'id': client_id})
+            client = response.get('Item')
+            if client and 'phone_number' in client:
+                send_sms(client['phone_number'], message)
+                successful_sends += 1
+            else:
+                print(f"No client found with ID: {client_id} or missing phone number.")
+        except ClientError as e:
+            print(f"Error fetching client {client_id}: {e}")
+
+    return f"Message sent to {successful_sends} clients."
 
 def send_sms(phone_number, message):
     try:
         print(f"Sending SMS to {phone_number}: {message}")
-        message = twilio_client.messages.create(
+        sent_message = twilio_client.messages.create(
             body=message,
             from_=twilio_phone_number,
             to=phone_number
         )
-        print(f"Message sent with SID: {message.sid}")
+        print(f"Message sent with SID: {sent_message.sid}")
     except Exception as e:
         print(f"Failed to send SMS to {phone_number}: {e}")
 
@@ -107,7 +140,7 @@ def handler(event, context):
             return {
                 'statusCode': 500,
                 'headers': headers,
-                'body': json.dumps(f"Internal Server Error: {str(e)}")
+                'body': json.dumps('Internal Server Error')
             }
     
     # Handle POST request
@@ -136,13 +169,21 @@ def handler(event, context):
         message = body.get('message')
         all_numbers = body.get('all_numbers', False)
         select_numbers = body.get('select_numbers', [])
-        # Process CSV data if present
         csv_data = body.get('csv_data', [])
 
         print(f"Message: {message}")
         print(f"All Numbers: {all_numbers}")
         print(f"Selected Numbers: {select_numbers}")
         print(f"CSV Data: {csv_data}")
+
+        # Validate message
+        if not message:
+            print("No message provided.")
+            return {
+                'statusCode': 400,
+                'headers': headers,
+                'body': json.dumps('Message content is required.')
+            }
 
         # Initialize a flag to track if CSV data was processed
         csv_processed = False
@@ -159,21 +200,26 @@ def handler(event, context):
                     continue  # Skip rows with missing required data
 
                 # Put item into DynamoDB
-                print(f"Adding/updating client in DynamoDB: {phone_number}")
-                clients_table.put_item(Item={
-                    'id': phone_number,  # Use phone_number as unique identifier
-                    'name': name,
-                    'phone_number': phone_number,
-                    'email': email
-                })
+                try:
+                    print(f"Adding/updating client in DynamoDB: {phone_number}")
+                    clients_table.put_item(Item={
+                        'id': phone_number,  # Use phone_number as unique identifier
+                        'name': name,
+                        'phone_number': phone_number,
+                        'email': email
+                    })
+                except ClientError as e:
+                    print(f"Error adding/updating client {phone_number}: {e}")
             csv_processed = True
 
         # Send messages
         if all_numbers:
             response_message = send_message_to_all_clients(message)
-        else:
+        elif select_numbers:
             response_message = send_message_to_selected_clients(message, select_numbers)
-        
+        else:
+            response_message = 'No recipients specified.'
+
         if csv_processed:
             response_message += ' CSV data processed and clients updated.'
 
