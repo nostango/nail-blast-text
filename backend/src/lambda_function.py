@@ -1,9 +1,32 @@
 import json
 import boto3
+import os
+from botocore.exceptions import ClientError
+from twilio.rest import Client
 
 # Initialize DynamoDB resource
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 clients_table = dynamodb.Table('client_db_test')
+
+# Initialize Secrets Manager client
+secrets_client = boto3.client('secretsmanager', region_name='us-east-1')
+secret_name = 'twilio/credentials'
+
+# Function to retrieve Twilio credentials from Secrets Manager
+def get_twilio_credentials():
+    try:
+        response = secrets_client.get_secret_value(SecretId=secret_name)
+        secret = response['SecretString']
+        secret_dict = json.loads(secret)
+        return secret_dict
+    except ClientError as e:
+        print(f"Error retrieving secret {secret_name}: {e}")
+        raise e
+
+# Retrieve Twilio credentials once and initialize Twilio client
+twilio_secrets = get_twilio_credentials()
+twilio_client = Client(twilio_secrets['TWILIO_ACCOUNT_SID'], twilio_secrets['TWILIO_AUTH_TOKEN'])
+twilio_phone_number = twilio_secrets['TWILIO_PHONE_NUMBER']
 
 def get_all_clients():
     print("Fetching all clients from DynamoDB.")
@@ -22,7 +45,7 @@ def send_message_to_all_clients(message):
     for client in clients:
         send_sms(client['phone_number'], message)
     
-    return (f"Message sent to all {len(clients)} clients: {clients}")
+    return f"Message sent to all {len(clients)} clients."
 
 def send_message_to_selected_clients(message, clients_list):
     print(f"Sending messages to selected clients: {clients_list}")
@@ -37,12 +60,19 @@ def send_message_to_selected_clients(message, clients_list):
         else:
             print(f"No client found with ID: {client_id}")
 
-    return (f"Message sent to {len(clients_list)} clients: {clients_list}")
+    return f"Message sent to {len(clients_list)} clients."
 
 def send_sms(phone_number, message):
-    # Send SMS with Twilio
-    print(f"Sending SMS to {phone_number}: {message}")
-    pass  # Replace with actual Twilio integration
+    try:
+        print(f"Sending SMS to {phone_number}: {message}")
+        message = twilio_client.messages.create(
+            body=message,
+            from_=twilio_phone_number,
+            to=phone_number
+        )
+        print(f"Message sent with SID: {message.sid}")
+    except Exception as e:
+        print(f"Failed to send SMS to {phone_number}: {e}")
 
 # Default headers
 headers = {
@@ -129,7 +159,7 @@ def handler(event, context):
                     continue  # Skip rows with missing required data
 
                 # Put item into DynamoDB
-                print(f"Adding client to DynamoDB: {phone_number}")
+                print(f"Adding/updating client in DynamoDB: {phone_number}")
                 clients_table.put_item(Item={
                     'id': phone_number,  # Use phone_number as unique identifier
                     'name': name,
@@ -140,11 +170,9 @@ def handler(event, context):
 
         # Send messages
         if all_numbers:
-            first_cond_response = send_message_to_all_clients(message)
-            response_message = f'Message sent to selected clients: {first_cond_response}'
+            response_message = send_message_to_all_clients(message)
         else:
-            second_cond_response = send_message_to_selected_clients(message, select_numbers)
-            response_message = f'Message sent to selected clients: {second_cond_response}'
+            response_message = send_message_to_selected_clients(message, select_numbers)
         
         if csv_processed:
             response_message += ' CSV data processed and clients updated.'
