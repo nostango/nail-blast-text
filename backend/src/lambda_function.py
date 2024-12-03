@@ -41,7 +41,7 @@ def send_message_to_all_clients(message):
         send_sms(client['phone_number'], message)
         print(f"Message sent to {client['phone_number']}.")
     
-    return f"Simulated message sent to all {len(clients)} clients."
+    return f"Simulated message: {message} sent to all {len(clients)} clients."
 
 def send_message_to_selected_clients(message, clients_list):
     """
@@ -140,12 +140,6 @@ def handler(event, context):
         all_numbers = body.get('all_numbers', False)
         select_numbers = body.get('select_numbers', [])
         csv_data = body.get('csv_data', [])
-
-        print(f"Message: {message}")
-        print(f"All Numbers: {all_numbers}")
-        print(f"Selected Numbers: {select_numbers}")
-        print(f"CSV Data: {csv_data}")
-
         # Validate message
         if not message:
             print("No message provided.")
@@ -181,6 +175,8 @@ def handler(event, context):
                 except ClientError as e:
                     print(f"Error adding/updating client {phone_number}: {e}")
             csv_processed = True
+            # Fetch all clients again after processing CSV data
+            clients = get_all_clients()
 
         # Send messages
         if all_numbers:
