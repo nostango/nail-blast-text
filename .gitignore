@@ -3,3 +3,4 @@ __pycache__/
 node_modules/
 test/
 frontend/nail-tech-blast/my_lambda_function/
+tree.py
