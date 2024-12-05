@@ -160,6 +160,8 @@ export function GroupMessageFormComponent() {
   
       const result = await response.json()
       console.log('Message sent successfully:', result)
+      // Display success message to the user as a green confirmation box on the page
+      alert('Message sent successfully!')
   
       // Reset form if needed
       setMessage('')

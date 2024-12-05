@@ -1,16 +1,38 @@
 import json
 import boto3
-import os
+from twilio.rest import Client
 from botocore.exceptions import ClientError
 
 # Initialize DynamoDB resource
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-clients_table = dynamodb.Table('client_db_test')
+clients_table = dynamodb.Table('testing_my_phone_number')
 
-# Initialize Secrets Manager client
-secrets_client = boto3.client('secretsmanager', region_name='us-east-1')
 
-# Removed Twilio-related environment variables and caches
+def get_twilio_credentials(secret_name, region_name="us-east-1"):
+    client = boto3.client("secretsmanager", region_name=region_name)
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+        # Secrets Manager stores the secret as a JSON string
+        secret = json.loads(get_secret_value_response["SecretString"])
+        return secret
+    except Exception as e:
+        print(f"Error retrieving secret: {e}")
+        raise
+
+# Set the secret name and region
+secret_name = "twilio/credentials"
+region_name = "us-east-1"  # Adjust to your AWS region
+
+# Retrieve Twilio credentials
+credentials = get_twilio_credentials(secret_name, region_name)
+
+# Extract the credentials
+account_sid = credentials["TWILIO_ACCOUNT_SID"]
+auth_token = credentials["TWILIO_AUTH_TOKEN"]
+twilio_phone_number = credentials["TWILIO_PHONE_NUMBER"]
+
+# Initialize the Twilio client
+twilio_client = Client(account_sid, auth_token)
 
 def get_all_clients():
     """
@@ -39,7 +61,7 @@ def send_message_to_all_clients(message):
     for client in clients:
         # Simulate sending SMS
         send_sms(client['phone_number'], message)
-        print(f"Message sent to {client['phone_number']}.")
+        print(f"Message: {message} sent to {client['phone_number']}.")
     
     return f"Simulated message: {message} sent to all {len(clients)} clients."
 
@@ -52,7 +74,6 @@ def send_message_to_selected_clients(message, clients_list):
 
     for client_id in clients_list:
         try:
-            print(f"Fetching client with ID: {client_id}")
             response = clients_table.get_item(Key={'id': client_id})
             client = response.get('Item')
             if client and 'phone_number' in client:
@@ -66,11 +87,12 @@ def send_message_to_selected_clients(message, clients_list):
     return f"Simulated message sent to {successful_sends} clients."
 
 def send_sms(phone_number, message):
-    """
-    Placeholder for sending an SMS message.
-    """
-    print(f"Simulating sending SMS to {phone_number}: {message}")
-    # No actual SMS is sent.
+    message = twilio_client.messages.create(
+        body=message,
+        from_=twilio_phone_number,
+        to=phone_number,  # Replace with the recipient's phone number
+    )
+    
 
 # Default headers for HTTP responses
 headers = {
@@ -94,8 +116,6 @@ def handler(event, context):
             'headers': headers,
             'body': ''
         }
-    
-    # Removed Twilio client initialization
     
     if method == 'GET':
         try:
