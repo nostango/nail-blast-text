@@ -169,15 +169,19 @@ export function GroupMessageFormComponent() {
       setAllNumbers(false)
       setCsvData([])
   
-    } catch (error: any) {
-      console.error('Error:', error.message || error)
-      // Optionally, display the error message to the user
-      alert(`Failed to send message: ${error.message || 'Unknown error.'}`)
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Error:', error.message);
+        alert(`Failed to send message: ${error.message}`);
+      } else {
+        console.error('Unknown error:', error);
+        alert('Failed to send message: Unknown error.');
+      }
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-md mx-auto p-6 bg-white rounded-lg shadow">
+    <form id="text-submission"  onSubmit={handleSubmit} className="space-y-6 max-w-md mx-auto p-6 bg-white rounded-lg shadow">
       <div className="space-y-2">
         <Label htmlFor="csv-upload">Upload CSV</Label>
         <Input

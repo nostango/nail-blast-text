@@ -7,7 +7,6 @@ from botocore.exceptions import ClientError
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 clients_table = dynamodb.Table('testing_my_phone_number')
 
-
 def get_twilio_credentials(secret_name, region_name="us-east-1"):
     client = boto3.client("secretsmanager", region_name=region_name)
     try:
@@ -87,11 +86,16 @@ def send_message_to_selected_clients(message, clients_list):
     return f"Simulated message sent to {successful_sends} clients."
 
 def send_sms(phone_number, message):
-    message = twilio_client.messages.create(
-        body=message,
-        from_=twilio_phone_number,
-        to=phone_number,  # Replace with the recipient's phone number
-    )
+    try:
+        message = twilio_client.messages.create(
+            body=message,
+            from_=twilio_phone_number,
+            to=phone_number,  # Replace with the recipient's phone number
+        )
+        print(f"Message sent with SID: {message.sid}")
+    except Exception as e:
+        print(f"Error sending SMS: {e}")
+
     
 
 # Default headers for HTTP responses
