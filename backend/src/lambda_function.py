@@ -18,6 +18,17 @@ def get_twilio_credentials(secret_name, region_name="us-east-1"):
         print(f"Error retrieving secret: {e}")
         raise
 
+def verify_twilio_credentials(twilio_client, account_sid):
+    """
+    Try to fetch Twilio account details to verify credentials are correct.
+    """
+    try:
+        account = twilio_client.api.accounts(account_sid).fetch()
+        print(f"Twilio Account Verification: Friendly Name={account.friendly_name}, Status={account.status}")
+    except Exception as e:
+        print(f"Error verifying Twilio credentials: {e}")
+        raise
+
 # Set the secret name and region
 secret_name = "twilio/credentials"
 region_name = "us-east-1"  # Adjust to your AWS region
@@ -32,6 +43,9 @@ twilio_phone_number = credentials["TWILIO_PHONE_NUMBER"]
 
 # Initialize the Twilio client
 twilio_client = Client(account_sid, auth_token)
+
+# Quick check to ensure credentials are correct
+verify_twilio_credentials(twilio_client, account_sid)
 
 def get_all_clients():
     """
