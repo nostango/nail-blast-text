@@ -90,6 +90,67 @@ def send_message_to_selected_clients(message, clients_list):
         except ClientError as e:
             print(f"Error fetching client: {e}")
 
+def upload_csv_data(csv_data):
+    for row in csv_data:
+        first_name = row.get('First Name') or row.get('name')  # Adjust based on CSV columns
+        last_name = row.get('Last Name') or ""  # If applicable
+        phone = row.get('phone_number') or row.get('phone') or ""
+        email = row.get('Email', '')
+        notes = row.get('Notes', '')
+        days_since_last_appointment = row.get('Days Since Last Appointment', '')
+
+        # Ensure required fields are present:
+        if not first_name or not phone:
+            print(f"Skipping row with missing required data: {row}")
+            continue  # Skip this row
+
+        # Construct the DynamoDB id:
+        raw_id_string = (first_name.strip().lower() + "_" + last_name.strip().lower())
+
+        # Generate a SHA-256 hash and take a portion of it
+        hash_object = hashlib.sha256(raw_id_string.encode('utf-8'))
+        id_val = hash_object.hexdigest()
+        id_val = id_val[:10]
+
+        try:
+            # Check if the item already exists:
+            existing_item_response = clients_table.get_item(Key={'id': id_val})
+            existing_item = existing_item_response.get('Item', None)
+
+            if existing_item:
+                # If the item exists, preserve its opt_in setting
+                opt_in = existing_item.get('opt_in', 'N')
+                # Update the existing item if needed
+                clients_table.update_item(
+                    Key={'id': id_val},
+                    UpdateExpression="set first_name=:f, last_name=:l, phone_number=:p, email=:e, notes=:n, days_since_last_appointment=:d",
+                    ExpressionAttributeValues={
+                        ':f': first_name,
+                        ':l': last_name,
+                        ':p': phone,
+                        ':e': email,
+                        ':n': notes,
+                        ':d': days_since_last_appointment,
+                    }
+                )
+            else:
+                # If it's a new item, set opt_in to 'N'
+                opt_in = 'N'
+
+                clients_table.put_item(Item={
+                    'id': id_val,
+                    'first_name': first_name,
+                    'last_name': last_name,
+                    'phone_number': phone,
+                    'email': email,
+                    'notes': notes,
+                    'days_since_last_appointment': days_since_last_appointment,
+                    'opt_in': opt_in
+                })
+        except ClientError as e:
+            print(f"Error adding/updating client: {e}")
+
+    return f"CSV data processed and clients updated."
 
 # Default headers for HTTP responses
 headers = {
@@ -149,89 +210,86 @@ def handler(event, context):
                 'body': json.dumps(f'Invalid JSON in request body: {str(e)}')
             }
 
-        # Process the POST request
-        message = body.get('message')
-        all_numbers = body.get('all_numbers', False)
-        select_numbers = body.get('select_numbers', [])
-        csv_data = body.get('csv_data', [])
+        # Determine the action
+        action = body.get('action')
 
-        if csv_data:
-            print(f"Processing CSV data with {len(csv_data)} rows.")
-            for row in csv_data:
-                first_name = row.get('First Name')
-                last_name = row.get('Last Name')
-                phone = row.get('Phone')
-                email = row.get('Email', '')
-                notes = row.get('Notes', '')
-                days_since_last_appointment = row.get('Days Since Last Appointment', '')
+        if action == 'upload_csv':
+            csv_data = body.get('csv_data', [])
+            if not csv_data:
+                return {
+                    'statusCode': 400,
+                    'headers': headers,
+                    'body': json.dumps('csv_data is required for upload_csv action.')
+                }
+            try:
+                upload_result = upload_csv_data(csv_data)
+                return {
+                    'statusCode': 200,
+                    'headers': headers,
+                    'body': json.dumps(upload_result)
+                }
+            except Exception as e:
+                print(f"Error uploading CSV data: {str(e)}")
+                return {
+                    'statusCode': 500,
+                    'headers': headers,
+                    'body': json.dumps('Internal Server Error while uploading CSV data.')
+                }
 
-                # Ensure required fields are present:
-                if not first_name or not last_name or not phone:
-                    print(f"Skipping row with missing required data: {row}")
-                    continue  # Skip this row
+        elif action == 'send_message':
+            # Process sending messages as per existing logic
+            # Ensure message is present
+            message = body.get('message')
+            if not message:
+                print("No message provided.")
+                return {
+                    'statusCode': 400,
+                    'headers': headers,
+                    'body': json.dumps('Message content is required.')
+                }
 
-                # Construct the DynamoDB id:
-                raw_id_string = (first_name.strip().lower() + "_" + last_name.strip().lower())
+            all_numbers = body.get('all_numbers', False)
+            select_numbers = body.get('select_numbers', [])
+            csv_data = body.get('csv_data', [])
 
-                # Generate a SHA-256 hash and take a portion of it
-                hash_object = hashlib.sha256(raw_id_string.encode('utf-8'))
-                id_val = hash_object.hexdigest()
-                id_val = id_val[:10]
+            csv_processed = False
 
+            if csv_data:
                 try:
-                    # Check if the item already exists:
-                    existing_item_response = clients_table.get_item(Key={'id': id_val})
-                    existing_item = existing_item_response.get('Item', None)
+                    upload_csv_result = upload_csv_data(csv_data)
+                    csv_processed = True
+                except Exception as e:
+                    print(f"Error processing CSV data: {str(e)}")
+                    return {
+                        'statusCode': 500,
+                        'headers': headers,
+                        'body': json.dumps('Internal Server Error while processing CSV data.')
+                    }
 
-                    if existing_item:
-                        # If the item exists, preserve its opt_in setting
-                        opt_in = existing_item.get('opt_in', 'N')
-                    else:
-                        # If it's a new item, set opt_in to 'N'
-                        opt_in = 'N'
+            # Send messages
+            if all_numbers:
+                response_message = send_message_to_all_clients(message)
+            elif select_numbers:
+                response_message = send_message_to_selected_clients(message, select_numbers)
+            else:
+                response_message = 'No recipients specified.'
 
-                    clients_table.put_item(Item={
-                        'id': id_val,
-                        'first_name': first_name,
-                        'last_name': last_name,
-                        'phone_number': phone,
-                        'email': email,
-                        'notes': notes,
-                        'days_since_last_appointment': days_since_last_appointment,
-                        'opt_in': opt_in
-                    })
-                except ClientError as e:
-                    print(f"Error adding/updating client: {e}")
+            if csv_processed:
+                response_message += ' CSV data processed and clients updated.'
 
-            csv_processed = True
-            # Fetch all clients again after processing CSV data
-            clients = get_all_clients()
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': json.dumps(response_message)
+            }
 
-        # Validate message
-        if not message:
-            print("No message provided.")
+        else:
+            print(f"Unsupported action: {action}")
             return {
                 'statusCode': 400,
                 'headers': headers,
-                'body': json.dumps('Message content is required.')
+                'body': json.dumps('Unsupported action.')
             }
-        
-        # Send messages
-        if all_numbers:
-            response_message = send_message_to_all_clients(message)
-        elif select_numbers:
-            response_message = send_message_to_selected_clients(message, select_numbers)
-        else:
-            response_message = 'No recipients specified.'
-
-        if csv_processed:
-            response_message += ' CSV data processed and clients updated.'
-
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': json.dumps(response_message)
-        }
 
     # If an unsupported method is used, return a 405 Method Not Allowed
     print(f"Method {method} not allowed.")

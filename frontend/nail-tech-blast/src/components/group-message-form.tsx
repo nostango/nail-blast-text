@@ -41,6 +41,8 @@ export function GroupMessageFormComponent() {
   const [csvData, setCsvData] = useState<CsvRow[]>([])
   const [allNumbers, setAllNumbers] = useState(false)
   const [recipients, setRecipients] = useState<Recipient[]>([])
+  const [isUploadingCsv, setIsUploadingCsv] = useState(false)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
 
   useEffect(() => {
     const fetchRecipients = async () => {
@@ -91,7 +93,7 @@ export function GroupMessageFormComponent() {
           const data: CsvRowRaw[] = results.data
 
           const columnNameMapping: { [key: string]: keyof CsvRow } = {
-            'Client name': 'name',
+            'Client ID': 'id',
             'Name': 'name',
             'Client email address': 'email',
             'Email': 'email',
@@ -133,16 +135,24 @@ export function GroupMessageFormComponent() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-  
+
+    if (!message.trim()) {
+      alert('Message cannot be empty.')
+      return
+    }
+
     const formData = {
+      action: 'send_message',
       message,
       all_numbers: allNumbers,
       select_numbers: selectedRecipients,
       csv_data: csvData,
     }
-  
+
+    setIsSendingMessage(true)
+
     try {
       const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
         method: 'POST',
@@ -151,24 +161,26 @@ export function GroupMessageFormComponent() {
         },
         body: JSON.stringify(formData),
       })
-  
+
       if (!response.ok) {
         // Attempt to parse error message from response
         const errorData = await response.json()
         throw new Error(errorData.message || 'Error in sending the message.')
       }
-  
+
       const result = await response.json()
       console.log('Message sent successfully:', result)
       // Display success message to the user as a green confirmation box on the page
       alert('Message sent successfully!')
-  
+
       // Reset form if needed
       setMessage('')
       setSelectedRecipients([])
       setAllNumbers(false)
       setCsvData([])
-  
+
+      // Optionally refetch recipients
+      // fetchRecipients()
     } catch (error: unknown) {
       if (error instanceof Error) {
         console.error('Error:', error.message);
@@ -177,11 +189,63 @@ export function GroupMessageFormComponent() {
         console.error('Unknown error:', error);
         alert('Failed to send message: Unknown error.');
       }
+    } finally {
+      setIsSendingMessage(false)
+    }
+  }
+
+  const handleUploadCsv = async () => {
+    if (csvData.length === 0) {
+      alert('No CSV data to upload.')
+      return
+    }
+
+    const formData = {
+      action: 'upload_csv',
+      csv_data: csvData,
+    }
+
+    setIsUploadingCsv(true)
+
+    try {
+      const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      })
+
+      if (!response.ok) {
+        // Attempt to parse error message from response
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Error in uploading the CSV.')
+      }
+
+      const result = await response.json()
+      console.log('CSV uploaded successfully:', result)
+      alert('CSV uploaded successfully!')
+
+      // Reset CSV data if needed
+      setCsvData([])
+      setRecipients([])
+      // Optionally refetch recipients
+      // fetchRecipients()
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Error:', error.message);
+        alert(`Failed to upload CSV: ${error.message}`);
+      } else {
+        console.error('Unknown error:', error);
+        alert('Failed to upload CSV: Unknown error.');
+      }
+    } finally {
+      setIsUploadingCsv(false)
     }
   }
 
   return (
-    <form id="text-submission"  onSubmit={handleSubmit} className="space-y-6 max-w-md mx-auto p-6 bg-white rounded-lg shadow">
+    <form id="text-submission" onSubmit={handleSendMessage} className="space-y-6 max-w-md mx-auto p-6 bg-white rounded-lg shadow">
       <div className="space-y-2">
         <Label htmlFor="csv-upload">Upload CSV</Label>
         <Input
@@ -229,9 +293,14 @@ export function GroupMessageFormComponent() {
         </div>
       </div>
 
-      <Button type="submit" className="w-full">
-        Send Message
-      </Button>
+      <div className="flex space-x-4">
+        <Button type="submit" className="w-full" disabled={isSendingMessage}>
+          {isSendingMessage ? 'Sending...' : 'Send Message'}
+        </Button>
+        <Button type="button" className="w-full" onClick={handleUploadCsv} disabled={isUploadingCsv}>
+          {isUploadingCsv ? 'Uploading...' : 'Upload CSV'}
+        </Button>
+      </div>
     </form>
   )
 }
