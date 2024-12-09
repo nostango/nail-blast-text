@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import Papa from 'papaparse'
+// import { v4 as uuidv4 } from 'uuid' // Removed UUID import
 
 // Define the shape of a recipient as returned by the API
 interface ApiRecipient {
+  id: string // Ensure the API returns the 'id'
   name: string
   phone_number: string
   email?: string
@@ -25,9 +27,12 @@ interface Recipient {
 
 // Define the shape of a CSV row after normalization
 interface CsvRow {
-  name: string
+  first_name: string
+  last_name: string
   phone_number: string
   email?: string
+  notes?: string
+  days_since_last_appointment?: string
 }
 
 // Define the shape of a raw CSV row before normalization
@@ -43,27 +48,32 @@ export function GroupMessageFormComponent() {
   const [recipients, setRecipients] = useState<Recipient[]>([])
   const [isUploadingCsv, setIsUploadingCsv] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isCsvParsed, setIsCsvParsed] = useState(false)
 
   useEffect(() => {
-    const fetchRecipients = async () => {
-      try {
-        const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
-          method: 'GET',
-        })
-        const data: ApiRecipient[] = await response.json()
-        setRecipients(data.map((item, index) => ({
-          id: index.toString(),
-          name: item.name,
-          phone_number: item.phone_number,
-          email: item.email || '',
-        })))
-      } catch (error) {
-        console.error('Error fetching recipients:', error)
-      }
-    }
-
     fetchRecipients()
   }, [])
+
+  const fetchRecipients = async () => {
+    try {
+      const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
+        method: 'GET',
+      })
+      if (!response.ok) {
+        throw new Error('Failed to fetch recipients.')
+      }
+      const data: ApiRecipient[] = await response.json()
+      console.log('Fetched Recipients:', data) // Debugging log
+      setRecipients(data.map((item) => ({
+        id: item.id, // Use the backend-generated ID
+        name: item.name,
+        phone_number: item.phone_number,
+        email: item.email || '',
+      })))
+    } catch (error) {
+      console.error('Error fetching recipients:', error)
+    }
+  }
 
   const handleSelectAll = () => {
     setSelectedRecipients(recipients.map(r => r.id))
@@ -86,19 +96,22 @@ export function GroupMessageFormComponent() {
   const handleCsvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
+      console.log('Selected file:', file)
       Papa.parse<CsvRowRaw>(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => {
+        complete: async (results) => { // Make the callback async
+          console.log('Papa parse results:', results)
           const data: CsvRowRaw[] = results.data
 
           const columnNameMapping: { [key: string]: keyof CsvRow } = {
-            'Client ID': 'id',
-            'Name': 'name',
-            'Client email address': 'email',
+            'First Name': 'first_name',
+            'Last Name': 'last_name',
+            'Phone': 'phone_number',
             'Email': 'email',
-            'Client phone number': 'phone_number',
-            'Phone Number': 'phone_number'
+            'Notes': 'notes',
+            'Days Since Last Appointment': 'days_since_last_appointment'
+            // 'Banned' is intentionally omitted
           }
 
           const normalizedData: CsvRow[] = data.map((row) => {
@@ -113,20 +126,19 @@ export function GroupMessageFormComponent() {
             return normalizedRow as CsvRow
           })
 
+          console.log('Normalized Data:', normalizedData)
+
           // Filter out rows without required fields
           const filteredData = normalizedData.filter((row) => {
-            return row.name && row.phone_number
+            return row.first_name && row.last_name && row.phone_number
           })
 
-          setCsvData(filteredData)
+          console.log('Filtered Data:', filteredData)
 
-          // Optionally update recipients state
-          setRecipients(filteredData.map((row, index) => ({
-            id: (recipients.length + index).toString(), // Ensure unique IDs
-            name: row.name,
-            phone_number: row.phone_number,
-            email: row.email || '',
-          })))
+          setCsvData(filteredData)
+          setIsCsvParsed(filteredData.length > 0)
+
+          // No longer setting recipients here
         },
         error: (error) => {
           console.error('Error parsing CSV:', error)
@@ -178,9 +190,11 @@ export function GroupMessageFormComponent() {
       setSelectedRecipients([])
       setAllNumbers(false)
       setCsvData([])
+      setIsCsvParsed(false)
 
-      // Optionally refetch recipients
-      // fetchRecipients()
+      // Fetch updated recipients to include any new entries
+      await fetchRecipients()
+
     } catch (error: unknown) {
       if (error instanceof Error) {
         console.error('Error:', error.message);
@@ -195,6 +209,7 @@ export function GroupMessageFormComponent() {
   }
 
   const handleUploadCsv = async () => {
+    console.log('Uploading CSV Data:', csvData)
     if (csvData.length === 0) {
       alert('No CSV data to upload.')
       return
@@ -226,11 +241,13 @@ export function GroupMessageFormComponent() {
       console.log('CSV uploaded successfully:', result)
       alert('CSV uploaded successfully!')
 
+      // Fetch updated recipients with backend-generated IDs
+      await fetchRecipients()
+
       // Reset CSV data if needed
       setCsvData([])
-      setRecipients([])
-      // Optionally refetch recipients
-      // fetchRecipients()
+      setIsCsvParsed(false)
+
     } catch (error: unknown) {
       if (error instanceof Error) {
         console.error('Error:', error.message);
@@ -297,7 +314,7 @@ export function GroupMessageFormComponent() {
         <Button type="submit" className="w-full" disabled={isSendingMessage}>
           {isSendingMessage ? 'Sending...' : 'Send Message'}
         </Button>
-        <Button type="button" className="w-full" onClick={handleUploadCsv} disabled={isUploadingCsv}>
+        <Button type="button" className="w-full" onClick={handleUploadCsv} disabled={!isCsvParsed || isUploadingCsv}>
           {isUploadingCsv ? 'Uploading...' : 'Upload CSV'}
         </Button>
       </div>

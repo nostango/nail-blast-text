@@ -92,25 +92,25 @@ def send_message_to_selected_clients(message, clients_list):
 
 def upload_csv_data(csv_data):
     for row in csv_data:
-        first_name = row.get('First Name') or row.get('name')  # Adjust based on CSV columns
-        last_name = row.get('Last Name') or ""  # If applicable
-        phone = row.get('phone_number') or row.get('phone') or ""
-        email = row.get('Email', '')
-        notes = row.get('Notes', '')
-        days_since_last_appointment = row.get('Days Since Last Appointment', '')
+        # Access the correct keys as per frontend's csv_data
+        first_name = row.get('first_name') or ""
+        last_name = row.get('last_name') or ""
+        phone = row.get('phone_number') or ""
+        email = row.get('email', '')
+        notes = row.get('notes', '')
+        days_since_last_appointment = row.get('days_since_last_appointment', '')
 
-        # Ensure required fields are present:
+        # Ensure required fields are present
         if not first_name or not phone:
             print(f"Skipping row with missing required data: {row}")
             continue  # Skip this row
 
         # Construct the DynamoDB id:
         raw_id_string = (first_name.strip().lower() + "_" + last_name.strip().lower())
-
+        
         # Generate a SHA-256 hash and take a portion of it
         hash_object = hashlib.sha256(raw_id_string.encode('utf-8'))
-        id_val = hash_object.hexdigest()
-        id_val = id_val[:10]
+        id_val = hash_object.hexdigest()[:10]
 
         try:
             # Check if the item already exists:
