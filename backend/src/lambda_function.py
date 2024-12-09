@@ -199,9 +199,9 @@ def handler(event, context):
                 except ClientError as e:
                     print(f"Error adding/updating client {id_val}: {e}")
 
-    csv_processed = True
-    # Fetch all clients again after processing CSV data
-    clients = get_all_clients()
+            csv_processed = True
+            # Fetch all clients again after processing CSV data
+            clients = get_all_clients()
 
         # Validate message
         if not message:
