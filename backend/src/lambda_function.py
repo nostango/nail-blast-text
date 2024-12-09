@@ -1,5 +1,6 @@
 import json
 import boto3
+import hashlib
 from twilio.rest import Client
 from botocore.exceptions import ClientError
 
@@ -170,8 +171,12 @@ def handler(event, context):
                     continue  # Skip this row
 
                 # Construct the DynamoDB id:
-                # For example: "john_doe" for First Name "John", Last Name "Doe"
-                id_val = f"{first_name.strip().lower()}_{last_name.strip().lower()}"
+                raw_id_string = (first_name.strip().lower() + "_" + last_name.strip().lower())
+
+                # Generate a SHA-256 hash and take a portion of it
+                hash_object = hashlib.sha256(raw_id_string.encode('utf-8'))
+                id_val = hash_object.hexdigest()
+                id_val = id_val[:10]
 
                 try:
                     # Check if the item already exists:
@@ -185,7 +190,6 @@ def handler(event, context):
                         # If it's a new item, set opt_in to 'N'
                         opt_in = 'N'
 
-                    print(f"Adding/updating client in DynamoDB: {id_val}")
                     clients_table.put_item(Item={
                         'id': id_val,
                         'first_name': first_name,
@@ -197,7 +201,7 @@ def handler(event, context):
                         'opt_in': opt_in
                     })
                 except ClientError as e:
-                    print(f"Error adding/updating client {id_val}: {e}")
+                    print(f"Error adding/updating client: {e}")
 
             csv_processed = True
             # Fetch all clients again after processing CSV data
