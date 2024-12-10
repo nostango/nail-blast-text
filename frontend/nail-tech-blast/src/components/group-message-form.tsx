@@ -7,15 +7,19 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import Papa from 'papaparse'
-// import { v4 as uuidv4 } from 'uuid' // Removed UUID import
 
 // Define the shape of a recipient as returned by the API
 interface ApiRecipient {
-  id: string // Ensure the API returns the 'id'
-  name: string
+  id: string
+  first_name: string
+  last_name: string
   phone_number: string
   email?: string
+  notes?: string
+  days_since_last_appointment?: string
+  opt_in?: string
 }
+
 
 // Define the shape of a recipient used within the component
 interface Recipient {
@@ -59,21 +63,36 @@ export function GroupMessageFormComponent() {
       const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
         method: 'GET',
       })
+      console.log('Fetch Response Status:', response.status)
+      console.log('Fetch Response Headers:', response.headers)
+  
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Fetch Error Response Body:', errorText)
         throw new Error('Failed to fetch recipients.')
       }
+  
       const data: ApiRecipient[] = await response.json()
-      console.log('Fetched Recipients:', data) // Debugging log
-      setRecipients(data.map((item) => ({
-        id: item.id, // Use the backend-generated ID
-        name: item.name,
+      console.log('Fetched Recipients Data:', data) // Detailed log
+  
+      const sortedData = data.sort((a, b) => a.first_name.localeCompare(b.first_name))
+      console.log('Sorted Recipients Data:', sortedData) // Log sorted data
+
+      const mappedRecipients: Recipient[] = sortedData.map((item) => ({
+        id: item.id,
+        name: `${item.first_name} ${item.last_name}`, // Combine first and last names
         phone_number: item.phone_number,
         email: item.email || '',
-      })))
+      }))
+  
+      console.log('Mapped Recipients:', mappedRecipients) // Verify mapping
+  
+      setRecipients(mappedRecipients)
     } catch (error) {
       console.error('Error fetching recipients:', error)
     }
   }
+  
 
   const handleSelectAll = () => {
     setSelectedRecipients(recipients.map(r => r.id))

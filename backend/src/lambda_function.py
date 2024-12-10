@@ -3,6 +3,7 @@ import boto3
 import hashlib
 from twilio.rest import Client
 from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Attr
 
 # Initialize DynamoDB resource
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
@@ -57,10 +58,13 @@ def send_sms(phone_number, message):
         print(f"Error sending SMS: {e}")
 
 def get_all_clients():
-    print("Fetching all clients from DynamoDB.")
+    print("Fetching all clients from DynamoDB with opt_in='Y'.")
     try:
-        response = clients_table.scan()
+        response = clients_table.scan(
+            FilterExpression=Attr('opt_in').eq('Y')  # Filter for opt_in = 'Y'
+        )
         clients = response.get('Items', [])
+        print(f"Fetched {len(clients)} clients with opt_in='Y'.")
         return clients
     except ClientError as e:
         print(f"Error fetching clients: {e}")
@@ -104,6 +108,11 @@ def upload_csv_data(csv_data):
         if not first_name or not phone:
             print(f"Skipping row with missing required data: {row}")
             continue  # Skip this row
+
+        # Ensure phone number is in E.164 format by getting rid of parenthesis, spaces and dashes
+        if not phone.startswith('+'):
+            phone = phone.replace('(', '').replace(')', '').replace(' ', '').replace('-', '')
+            phone = '+1' + phone  # Assuming US numbers
 
         # Construct the DynamoDB id:
         raw_id_string = (first_name.strip().lower() + "_" + last_name.strip().lower())
