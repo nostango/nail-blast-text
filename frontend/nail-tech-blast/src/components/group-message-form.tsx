@@ -63,8 +63,6 @@ export function GroupMessageFormComponent() {
       const response = await fetch('https://10g2414t07.execute-api.us-east-1.amazonaws.com/DEV/messages', {
         method: 'GET',
       })
-      console.log('Fetch Response Status:', response.status)
-      console.log('Fetch Response Headers:', response.headers)
   
       if (!response.ok) {
         const errorText = await response.text()
@@ -73,10 +71,8 @@ export function GroupMessageFormComponent() {
       }
   
       const data: ApiRecipient[] = await response.json()
-      console.log('Fetched Recipients Data:', data) // Detailed log
   
       const sortedData = data.sort((a, b) => a.first_name.localeCompare(b.first_name))
-      console.log('Sorted Recipients Data:', sortedData) // Log sorted data
 
       const mappedRecipients: Recipient[] = sortedData.map((item) => ({
         id: item.id,
@@ -84,8 +80,6 @@ export function GroupMessageFormComponent() {
         phone_number: item.phone_number,
         email: item.email || '',
       }))
-  
-      console.log('Mapped Recipients:', mappedRecipients) // Verify mapping
   
       setRecipients(mappedRecipients)
     } catch (error) {
@@ -115,12 +109,10 @@ export function GroupMessageFormComponent() {
   const handleCsvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
-      console.log('Selected file:', file)
       Papa.parse<CsvRowRaw>(file, {
         header: true,
         skipEmptyLines: true,
-        complete: async (results) => { // Make the callback async
-          console.log('Papa parse results:', results)
+        complete: async (results) => {
           const data: CsvRowRaw[] = results.data
 
           const columnNameMapping: { [key: string]: keyof CsvRow } = {
@@ -145,14 +137,10 @@ export function GroupMessageFormComponent() {
             return normalizedRow as CsvRow
           })
 
-          console.log('Normalized Data:', normalizedData)
-
           // Filter out rows without required fields
           const filteredData = normalizedData.filter((row) => {
             return row.first_name && row.last_name && row.phone_number
           })
-
-          console.log('Filtered Data:', filteredData)
 
           setCsvData(filteredData)
           setIsCsvParsed(filteredData.length > 0)
@@ -200,7 +188,6 @@ export function GroupMessageFormComponent() {
       }
 
       const result = await response.json()
-      console.log('Message sent successfully:', result)
       // Display success message to the user as a green confirmation box on the page
       alert('Message sent successfully!')
 
@@ -228,7 +215,6 @@ export function GroupMessageFormComponent() {
   }
 
   const handleUploadCsv = async () => {
-    console.log('Uploading CSV Data:', csvData)
     if (csvData.length === 0) {
       alert('No CSV data to upload.')
       return
@@ -257,7 +243,6 @@ export function GroupMessageFormComponent() {
       }
 
       const result = await response.json()
-      console.log('CSV uploaded successfully:', result)
       alert('CSV uploaded successfully!')
 
       // Fetch updated recipients with backend-generated IDs
