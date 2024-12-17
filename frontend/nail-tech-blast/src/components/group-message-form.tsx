@@ -186,8 +186,6 @@ export function GroupMessageFormComponent() {
         const errorData = await response.json()
         throw new Error(errorData.message || 'Error in sending the message.')
       }
-
-      const result = await response.json()
       // Display success message to the user as a green confirmation box on the page
       alert('Message sent successfully!')
 
@@ -242,7 +240,6 @@ export function GroupMessageFormComponent() {
         throw new Error(errorData.message || 'Error in uploading the CSV.')
       }
 
-      const result = await response.json()
       alert('CSV uploaded successfully!')
 
       // Fetch updated recipients with backend-generated IDs
