@@ -35,10 +35,9 @@ jobs:
         fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
 
     # Step 2: Install AWS CLI (if not already available)
-    - name: Install AWS CLI
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y awscli
+    - name: Install AWS CLI using pip
+      run: pip install awscli --upgrade --user
+
 
     # Step 3: Zip the Lambda function
     - name: Zip Lambda function
